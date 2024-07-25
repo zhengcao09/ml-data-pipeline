@@ -5,61 +5,43 @@ from pathlib import Path
 
 import numpy as np
 from tqdm import tqdm
+from sklearn.model_selection import train_test_split
 
 # Parameters
 img_formats = ["bmp", "jpg", "jpeg", "png", "tif", "tiff", "dng"]  # acceptable image suffixes
 vid_formats = ["mov", "avi", "mp4", "mpg", "mpeg", "m4v", "wmv", "mkv"]  # acceptable video suffixes
 
 
-def split_rows_simple(file="../data/sm4/out.txt"):  # from utils import *; split_rows_simple()
-    """Splits a text file into train, test, and val files based on specified ratios; expects a file path as input."""
-    with open(file) as f:
-        lines = f.readlines()
-
-    s = Path(file).suffix
-    lines = sorted(list(filter(lambda x: len(x) > 0, lines)))
-    i, j, k = split_indices(lines, train=0.9, test=0.1, validate=0.0)
-    for k, v in {"train": i, "test": j, "val": k}.items():  # key, value pairs
-        if v.any():
-            new_file = file.replace(s, f"_{k}{s}")
-            with open(new_file, "w") as f:
-                f.writelines([lines[i] for i in v])
-
-
-def split_files(out_path, file_name, prefix_path=""):  # split training data
+def split_files(out_path, in_path):  # split training data
     """Splits file names into separate train, test, and val datasets and writes them to prefixed paths."""
-    file_name = list(filter(lambda x: len(x) > 0, file_name))
-    file_name = sorted(file_name)
-    i, j, k = split_indices(file_name, train=0.9, test=0.1, validate=0.0)
-    datasets = {"train": i, "test": j, "val": k}
-    for key, item in datasets.items():
-        if item.any():
-            with open(f"{out_path}_{key}.txt", "a") as file:
-                for i in item:
-                    file.write("%s%s\n" % (prefix_path, file_name[i]))
+    file_names = list(filter(lambda x: len(x) > 0, os.listdir(in_path / "images")))
+    file_names = np.array(file_names)
+    train, rest = train_test_split(file_names, train_size=0.8, test_size=0.2)
+    val, test = train_test_split(rest, test_size=0.5)
+
+    for file in train:
+        os.rename(in_path / "images" / file, out_path / "train" / "images" / file)
+        txt_file = file.replace("png", "txt")
+        os.rename(in_path / "labels" / txt_file, out_path / "train" / "labels" / txt_file)
+
+    for file in val:
+        os.rename(in_path / "images" / file, out_path / "valid" / "images" / file)
+        txt_file = file.replace("png", "txt")
+        os.rename(in_path / "labels" / txt_file, out_path / "valid" / "labels" / txt_file)
+
+    for file in test:
+        os.rename(in_path / "images" / file, out_path / "test" / "images" / file)
+        txt_file = file.replace("png", "txt")
+        os.rename(in_path / "labels" / txt_file, out_path / "test" / "labels" / txt_file)
 
 
-def split_indices(x, train=0.9, test=0.1, validate=0.0, shuffle=True):  # split training data
-    """Splits array indices for train, test, and validate datasets according to specified ratios."""
-    n = len(x)
-    v = np.arange(n)
-    if shuffle:
-        np.random.shuffle(v)
-
-    i = round(n * train)  # train
-    j = round(n * test) + i  # test
-    k = round(n * validate) + j  # validate
-    return v[:i], v[i:j], v[j:k]  # return indices
-
-
-def make_dirs(dir):
+def make_dirs(dir="datasets/"):
     """Creates a directory with subdirectories 'labels' and 'images', removing existing ones."""
     dir = Path(dir)
     # if dir.exists():
     #     shutil.rmtree(dir)  # delete dir
-    print("make_dirs")
-    for p in dir, dir / "labels":
-        print(p)
+    for p in (dir / "train" / "images", dir / "train" / "labels", dir / "valid" / "images", dir / "valid" / "labels",
+              dir / "test" / "images", dir / "test" / "labels"):
         p.mkdir(parents=True, exist_ok=True)  # make dir
     return dir
 
@@ -85,30 +67,6 @@ def image_folder2file(folder="images/"):  # from utils import *; image_folder2fi
     with open(f"{folder[:-1]}.txt", "w") as file:
         for l in s:
             file.write(l + "\n")  # write image list
-
-
-def add_coco_background(path="../data/sm4/", n=1000):  # from utils import *; add_coco_background()
-    """
-    Adds COCO dataset background images to a specified folder and lists them in outb.txt; usage:
-
-    `add_coco_background('path/', 1000)`.
-    """
-    p = f"{path}background"
-    if os.path.exists(p):
-        shutil.rmtree(p)  # delete output folder
-    os.makedirs(p)  # make new output folder
-
-    # copy images
-    for image in glob.glob("../coco/images/train2014/*.*")[:n]:
-        os.system(f"cp {image} {p}")
-
-    # add to outb.txt and make train, test.txt files
-    f = f"{path}out.txt"
-    fb = f"{path}outb.txt"
-    os.system(f"cp {f} {fb}")
-    with open(fb, "a") as file:
-        file.writelines(i + "\n" for i in glob.glob(f"{p}/*.*"))
-    split_rows_simple(file=fb)
 
 
 def create_single_class_dataset(path="../data/sm3"):  # from utils import *; create_single_class_dataset('../data/sm3/')

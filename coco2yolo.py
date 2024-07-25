@@ -1,22 +1,19 @@
 import json
+import os
 from collections import defaultdict
-
 
 from utils import *
 
 
-def convert_coco_json(json_dir, use_segments=False, cls91to80=False):
+def convert_coco_json(json_dir, id=None, use_segments=False, cls91to80=False):
     """Converts COCO JSON format to YOLO label format, with options for segments and class mapping."""
-    save_dir = make_dirs(json_dir)  # output directory
-    print("save_dir")
-    print(save_dir)
+    #save_dir = make_dirs()  # output directory
+    os.mkdir(json_dir / "labels")
     coco80 = coco91_to_coco80_class()
 
     # Import json
-    for json_file in sorted(Path(json_dir).resolve().glob("*.json")):
-        fn = Path(save_dir) / "labels" / json_file.stem.replace("instances_", "")  # folder name
-        print(fn)
-        fn.mkdir()
+    for json_file in sorted(json_dir.resolve().glob("*.json")):
+        fn = json_dir / "labels"
         with open(json_file) as f:
             data = json.load(f)
 
@@ -45,7 +42,10 @@ def convert_coco_json(json_dir, use_segments=False, cls91to80=False):
                 if box[2] <= 0 or box[3] <= 0:  # if w <= 0 and h <= 0
                     continue
 
-                cls = coco80[ann["category_id"] - 1] if cls91to80 else ann["category_id"] - 1  # class
+                if not id:
+                    cls = coco80[ann["category_id"] - 1] if cls91to80 else ann["category_id"] - 1  # class
+                else:
+                    cls = coco80[id] if cls91to80 else id
                 box = [cls] + box.tolist()
                 if box not in bboxes:
                     bboxes.append(box)
@@ -66,6 +66,8 @@ def convert_coco_json(json_dir, use_segments=False, cls91to80=False):
                 for i in range(len(bboxes)):
                     line = (*(segments[i] if use_segments else bboxes[i]),)  # cls, box or segments
                     file.write(("%g " * len(line)).rstrip() % line + "\n")
+
+            #os.rename(Path(json_dir) / "images" / f, save_dir / "images" / f)
 
 
 def merge_multi_segment(segments):
@@ -106,7 +108,7 @@ def merge_multi_segment(segments):
                     s.append(segments[i])
                 else:
                     idx = [0, idx[1] - idx[0]]
-                    s.append(segments[i][idx[0] : idx[1] + 1])
+                    s.append(segments[i][idx[0]: idx[1] + 1])
 
         else:
             for i in range(len(idx_list) - 1, -1, -1):
