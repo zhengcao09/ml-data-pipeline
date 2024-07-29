@@ -1,11 +1,7 @@
-import time
+from fathomnet.api import boundingboxes
 
-from fathomnet.api import images, boundingboxes
 from coco2yolo import convert_coco_json
-import os
 from utils import *
-from sklearn.model_selection import train_test_split
-
 
 DIR = "download/fathomnet"
 TEST_PATH = "./datasets/test/images"
